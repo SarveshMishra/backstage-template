@@ -1,0 +1,89 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: dotnet8-grpc-microservice-template
+  title: Create a .NET 8 gRPC Microservice Console Application
+  description: Create a starter .NET 8 gRPC microservice console application
+  tags:
+    - recommended
+    - dotnet
+    - grpc
+    - microservice
+spec:
+  owner: sarveshmishra
+  system: sarveshmishra-idp
+  type: service
+
+  parameters:
+    - title: GitHub Team Validation
+      required:
+        - githubUsername
+      properties:
+        githubUsername:
+          title: GitHub Username
+          type: string
+          description: Your GitHub username for team validation
+
+    - title: Provide information about the new component
+      required:
+        - repoName
+        - teamOwner
+      properties:
+        repoName:
+          title: Repository Name
+          type: string
+          description: The name of the GitHub repository
+        teamOwner:
+          title: Team Owner
+          type: string
+          description: The team that owns this service
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind:
+                - Group
+                - User
+
+  steps:
+    - id: validateGitHubTeam
+      name: Validating GitHub Team Membership
+      action: custom:validate-github-team
+      input:
+        username: ${{ parameters.githubUsername }}
+        requiredTeam: devops
+
+    - id: sourceCodeTemplate
+      name: Generating the Source Code Component
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          repoName: ${{ parameters.repoName }}
+          teamOwner: ${{ parameters.teamOwner }}
+          applicationType: grpc-microservice
+          dotnetVersion: 8
+          sourceControl: github.com
+
+    - id: createGithubRepo
+      name: Creating GitHub Repository
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: gRPC Microservice built with .NET 8
+        repoUrl: github.com?owner=${{ parameters.teamOwner }}&repo=${{ parameters.repoName }}
+        defaultBranch: main
+
+    - id: register
+      name: Registering the Catalog Info Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.createGithubRepo.output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: Open the Source Code Repository
+        url: ${{ steps.createGithubRepo.output.remoteUrl }}
+      - title: Open the Catalog Info Component
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
